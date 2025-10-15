@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+polytrack-env/
+venv/
+.env/
+
+# Data & models
+data/
+models/
+*.npz
+*.pth
+*.zip
+
+# Logs
+*.log
+runs/
+wandb/
+
+# System files
+.DS_Store
+.idea/
+.vscode/
