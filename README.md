@@ -1,32 +1,48 @@
-# Polytrack AI 🎮
+# Polytrack AI 🎮🤖
 
-A reinforcement learning agent trained to master the Polytrack video game and compete for world records.
+A reinforcement learning agent trained to master the Polytrack racing game and compete for world records using deep learning and computer vision.
 
 ## Overview
 
-This project uses **Dueling Deep Q-Networks (Dueling DQN)** to train an autonomous agent that learns to play Polytrack optimally. The agent uses computer vision for real-time game state analysis and achieves superhuman performance through deep reinforcement learning.
+This project uses **Dueling Deep Q-Networks (Dueling DQN)** combined with real-time computer vision to train an autonomous agent that learns optimal racing strategies in Polytrack. The agent processes game frames directly, detects game state through pixel analysis, and learns to make split-second decisions to achieve superhuman performance.
 
 ## Features
 
-- **Dueling DQN Architecture**: Advanced reinforcement learning model with separate value and advantage streams
-- **Real-time Screen Capture**: Low-latency frame capture using `mss` library (~50ms per frame)
-- **OCR-based Metrics Extraction**: Extracts speed and time data directly from game UI
-- **Replay Buffer**: Experience replay for efficient learning from past gameplay
-- **Model Checkpointing**: Automatic saving of best-performing models
-- **PyAutoGUI Control**: Direct keyboard input without bot detection
+- **Dueling DQN Architecture**: Advanced RL model with separate value and advantage streams for better decision-making
+- **Real-time Vision Processing**: Low-latency screen capture at ~50ms per frame using `mss`
+- **Intelligent Crash Detection**: Multi-method crash detection including sudden speed drops and stuck vehicle detection
+- **Vision-Based Metrics**: Pixel-intensity analysis for speed tracking (no OCR required)
+- **Experience Replay**: Efficient learning from past gameplay stored in replay buffer
+- **Automatic Checkpointing**: Saves best-performing models automatically
+- **MPS Optimization**: Leverages Apple Silicon M3 GPU acceleration via Metal Performance Shaders
+- **Graceful Interruption**: Press Ctrl+C anytime to safely stop and resume training later
+
+## Technical Highlights
+
+### Why Vision-Based Instead of OCR?
+Initially attempted OCR for reading speed/time metrics, but pixel-intensity analysis proved:
+- **Faster**: No OCR processing overhead
+- **More reliable**: No misreading of digits
+- **Better for RL**: Agent learns from visual patterns rather than numeric values
+
+### Crash Detection System
+Implements dual crash detection:
+1. **High-speed crashes**: Detects sudden speed drops (>30 units)
+2. **Stuck detection**: Monitors speed variance over time to catch low-speed collisions and getting wedged on track edges
 
 ## Installation
 
 ### Prerequisites
 - Python 3.8+
-- MacBook Air (or any machine with CUDA/MPS support)
-- Polytrack game accessible in browser
+- MacBook Air M3 (or any machine with MPS/CUDA support)
+- Polytrack accessible in browser
+- macOS with Homebrew (for Tesseract, optional)
 
 ### Setup
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/polytrack-ai.git
+git clone https://github.com/sahusaurya/polytrack-ai.git
 cd polytrack-ai
 ```
 
@@ -43,86 +59,127 @@ pip install torch torchvision torchaudio
 pip install -r requirements.txt
 ```
 
+4. (Optional) Install Tesseract for OCR experiments:
+```bash
+brew install tesseract
+```
+
 ## Usage
 
-1. Open Polytrack in your browser and keep it visible
+1. Open Polytrack in your browser (Brave recommended) and go fullscreen (F11)
 2. Run the training script:
 ```bash
 python src/train.py
 ```
 
-3. The agent will start learning. Monitor progress in the console output.
-4. Best models are automatically saved to `models/polytrack_model.pt`
+3. Press ENTER when prompted, then quickly switch to the Polytrack window (you have 3 seconds)
+4. The AI takes over and starts learning!
+
+### Stopping and Resuming Training
+- Press `Ctrl+C` anytime to safely stop training
+- Model is automatically saved
+- Run `python src/train.py` again to resume from the last checkpoint
 
 ## Project Structure
 
 ```
 polytrack-ai/
 ├── src/
-│   ├── train.py           # Main training loop
-│   ├── agent.py           # DQN agent implementation
-│   ├── environment.py     # Game interaction & screen capture
-│   └── utils.py           # Helper functions
-├── config/
-│   └── settings.py        # Configuration parameters
-├── models/                # Saved model checkpoints
-├── logs/                  # Training logs
-├── data/                  # Replay buffer data
-├── requirements.txt       # Python dependencies
+│   ├── train.py              # Main training loop with DQN agent
+│   ├── test_capture.py       # Test screen capture
+│   ├── test_ocr.py           # Test OCR regions (legacy)
+│   └── find_regions.py       # Helper to find UI element positions
+├── models/
+│   └── polytrack_best.pt     # Best model checkpoint (auto-saved)
+├── logs/                     # Training logs (future)
+├── data/                     # Replay buffer data (future)
+├── requirements.txt          # Python dependencies
+├── .gitignore               # Git ignore patterns
 └── README.md
 ```
 
 ## How It Works
 
-### 1. Vision Processing
-- Captures 50ms screenshots using `mss`
-- CNN encoder extracts features from game state
-- OCR reads speed/time metrics from UI
+### 1. Vision System
+- Captures 240x160 screenshots at 20 FPS using `mss`
+- CNN encoder extracts spatial features from game state
+- Pixel-intensity analysis tracks speed changes
+- Hash-based timer monitoring detects race completion
 
 ### 2. Decision Making
-- Dueling DQN processes game state
-- Selects actions: left, right, forward, idle
-- Uses epsilon-greedy exploration strategy
+- Dueling DQN processes visual features
+- 5 possible actions: idle, forward (W), left (A), right (D), brake (S)
+- Epsilon-greedy exploration (starts at 100%, decays to 1%)
+- PyAutoGUI sends keyboard commands directly to game
 
-### 3. Learning
-- Stores experiences in replay buffer
-- Trains on mini-batches from replay memory
-- Updates target network periodically
-- Saves best models based on episode rewards
+### 3. Learning Process
+- Experience replay buffer stores (state, action, reward, next_state)
+- Batched training on mini-batches of 64 experiences
+- Target network updated every 100 steps for stability
+- Smooth L1 loss for robust Q-value learning
 
-## Results
+### 4. Reward Structure
+- **+0.1** per step survived
+- **+(speed/100) × 0.1** for maintaining speed
+- **+100** for finishing the race
+- **-10** for crashing
+
+## Training Performance
 
 | Metric | Value |
 |--------|-------|
-| Best Episode Reward | TBD |
-| Training Episodes | TBD |
-| Average Frame Processing | ~50ms |
-| Model Size | ~2MB |
+| Input Resolution | 240x160 RGB |
+| Frame Processing | ~50ms per frame |
+| Actions per Second | ~20 |
+| Model Parameters | ~8.5M |
+| Model Size | ~35MB |
+| Device | Apple M3 (MPS) |
+| Replay Buffer | 50,000 transitions |
 
 ## Technologies Used
 
-- **PyTorch**: Deep learning framework
-- **OpenCV**: Image processing
-- **EasyOCR**: Text extraction from UI
-- **mss**: Low-latency screenshot capture
-- **PyAutoGUI**: Game input control
+- **PyTorch**: Deep learning framework with MPS acceleration
+- **OpenCV**: Image processing and computer vision
+- **mss**: Ultra-fast screenshot capture
+- **PyAutoGUI**: Keyboard/mouse automation
+- **NumPy**: Numerical computing
+- **Tesseract** (optional): OCR experiments
+
+## Development Journey
+
+### Challenges Overcome
+1. **Backend Access**: Initially tried accessing game backend - not possible with browser games
+2. **Selenium Detection**: Game blocked automated browsers, switched to direct screen capture
+3. **OCR Unreliability**: Tesseract struggled with game fonts, pivoted to pixel-intensity analysis
+4. **MPS Compatibility**: Fixed adaptive pooling issues specific to Apple Silicon
+5. **Stuck Detection**: Added sophisticated crash detection beyond simple speed monitoring
 
 ## Future Improvements
 
-- [ ] Implement prioritized experience replay
-- [ ] Add A3C (Asynchronous Advantage Actor-Critic)
-- [ ] Multi-agent training for comparison
-- [ ] Web dashboard for training visualization
-- [ ] Support for multiple game modes
+- [ ] Implement prioritized experience replay for faster learning
+- [ ] Add curriculum learning (start with easier tracks)
+- [ ] Multi-track support and track-specific models
+- [ ] Real-time training visualization dashboard
+- [ ] A3C (Asynchronous Advantage Actor-Critic) for parallel training
+- [ ] Imitation learning from human gameplay recordings
+- [ ] Transfer learning across similar racing games
 
 ## Contributing
 
-Feel free to fork, modify, and improve! This is a learning project.
+This is a learning project! Feel free to:
+- Fork and experiment
+- Submit issues for bugs
+- Suggest improvements via PRs
+- Share your training results
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - See LICENSE file for details
 
 ## Author
 
-Saurya Aditya Sahu
+**Saurya Aditya Sahu** ([@sahusaurya](https://github.com/sahusaurya))
+
+- Inspired by DeepMind's game-playing agents (DQN paper, AlphaGo)
+- Built with PyTorch and the RL community's best practices
+- Thanks to Polytrack developers for creating an engaging test environment
